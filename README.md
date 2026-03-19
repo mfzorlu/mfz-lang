@@ -1,90 +1,97 @@
 # MFZ Lang
 
-MFZ, C ile yazılmış sıfırdan geliştirilmiş bir programlama dili ve interpreter'ıdır. Lexer, parser ve tree-walk interpreter'dan oluşan modüler bir yapıya sahiptir. `.mfz` uzantılı dosyaları çalıştırır.
+MFZ is a small programming language written in C — built from scratch with a lexer, recursive descent parser, and tree-walk interpreter. Source files use the `.mfz` extension.
 
-> Geliştirme sürecinde [Claude Sonnet 4.6](https://www.anthropic.com/claude) ile birlikte çalışılmıştır.
-
----
-
-## İçindekiler
-
-- [Kurulum](#kurulum)
-- [Kullanım](#kullanım)
-- [Dil Referansı](#dil-referansı)
-- [Proje Yapısı](#proje-yapısı)
-- [Geliştirme](#geliştirme)
+> Developed with the assistance of [Claude Sonnet 4.6](https://www.anthropic.com/claude).
 
 ---
 
-## Kurulum
-
-**Gereksinimler:** GCC, Make
+## Quick Start
 
 ```bash
-git clone https://github.com/kullanici/mfz-lang.git
+git clone https://github.com/mfzorlu/mfz-lang.git
 cd mfz-lang
 make
+./mfz/mfz program.mfz
 ```
-
-Derleme sonucunda `mfz/mfz` çalıştırılabilir dosyası oluşur.
 
 ---
 
-## Kullanım
+## Installation
+
+### Linux
+
+Installs the `mfz` command system-wide, registers the `.mfz` MIME type, and sets up the file icon and double-click support.
+
+**Requirements:** GCC, Make. Optional: `imagemagick` (for multi-resolution icons).
 
 ```bash
-# Bir .mfz dosyasını çalıştır
-./mfz/mfz program.mfz
+make
+sudo make install
+```
 
-# Token listesini göster (debug)
-./mfz/mfz program.mfz --tokens
+To uninstall:
 
-# AST ağacını göster (debug)
-./mfz/mfz program.mfz --ast
+```bash
+sudo make uninstall
+```
 
-# Her ikisini de göster
-./mfz/mfz program.mfz --all
+> If the `.mfz` file icon does not appear immediately, log out and back in.
 
-# Makefile üzerinden çalıştır
+### Windows
+
+**Requirements:** GCC (e.g. [WinLibs](https://winlibs.com/) or [MSYS2](https://www.msys2.org/))
+
+Right-click `install.bat` → **Run as administrator**
+
+This compiles the binary, adds it to PATH, and registers `.mfz` files in the registry (icon + double-click support).
+
+To uninstall: right-click `uninstall.bat` → **Run as administrator**
+
+---
+
+## Usage
+
+```bash
+mfz program.mfz            # run
+mfz program.mfz --tokens   # show token list (debug)
+mfz program.mfz --ast      # show AST (debug)
+mfz program.mfz --all      # tokens + AST + run
+```
+
+Or use Make:
+
+```bash
 make run FILE=program.mfz
 ```
 
 ---
 
-## Dil Referansı
+## Language Reference
 
-### Tipler
+### Types
 
-| Tip     | Açıklama          | Örnek           |
-|---------|-------------------|-----------------|
-| `int`   | Tam sayı          | `int x = 42;`   |
-| `float` | Ondalıklı sayı    | `float pi = 3.14;` |
-| `void`  | Dönüş değeri yok  | `void f() { }` |
+| Type    | Example              |
+|---------|----------------------|
+| `int`   | `int x = 42;`        |
+| `float` | `float pi = 3.14;`   |
+| `void`  | `void f() { }`       |
 
-### Değişken Tanımlama
+### Operators
 
+| Category      | Operators                          |
+|---------------|------------------------------------|
+| Arithmetic    | `+` `-` `*` `/` `%`               |
+| Comparison    | `==` `!=` `<` `>` `<=` `>=`       |
+| Logical       | `&&` `\|\|` `!`                   |
+| Assignment    | `=`                                |
+
+String concatenation with `+`:
 ```mfz
-int sayi = 10;
-float oran = 0.75;
-int toplam = sayi + 5;
+println("Hello" + ", " + "World!");
 ```
 
-### Operatörler
-
-| Kategori     | Operatörler                        |
-|--------------|------------------------------------|
-| Aritmetik    | `+` `-` `*` `/` `%`               |
-| Karşılaştırma| `==` `!=` `<` `>` `<=` `>=`       |
-| Mantıksal    | `&&` `\|\|` `!`                   |
-| Atama        | `=`                                |
-
-String birleştirme `+` ile yapılır:
-
-```mfz
-void mesaj = "Merhaba" + " Dünya";
-```
-
-### Koşullar
+### Control Flow
 
 ```mfz
 if (x > 0) {
@@ -92,144 +99,91 @@ if (x > 0) {
 } else {
     println(0);
 }
-```
 
-### Döngüler
-
-```mfz
-// while
-int i = 0;
 while (i < 10) {
     i = i + 1;
 }
 
-// for
 for (int j = 0; j < 5; j = j + 1) {
     println(j);
 }
 ```
 
-### Fonksiyonlar
+### Functions
 
 ```mfz
-int topla(int a, int b) {
-    return a + b;
-}
-
-int sonuc = topla(3, 4);
-println(sonuc);
-```
-
-Özyinelemeli fonksiyonlar desteklenir:
-
-```mfz
-int faktoriyel(int n) {
+int factorial(int n) {
     if (n <= 1) { return 1; }
-    return n * faktoriyel(n - 1);
+    return n * factorial(n - 1);
 }
 
-println(faktoriyel(7));  // 5040
+println(factorial(7));  // 5040
 ```
 
-### Yerleşik Fonksiyonlar
-
-| Fonksiyon       | Açıklama                        |
-|-----------------|---------------------------------|
-| `print(x)`      | Değeri yazdır                   |
-| `println(x)`    | Değeri yazdır + yeni satır      |
-| `sqrt(x)`       | Karekök                         |
-| `abs(x)`        | Mutlak değer                    |
-| `int(x)`        | Float → int dönüşümü            |
-| `float(x)`      | Int → float dönüşümü            |
-
-### Yorumlar
+Functions can access global variables:
 
 ```mfz
-// Tek satır yorum
+int counter = 0;
 
-/*
-   Çok satır
-   yorum
-*/
+int increment(int amount) {
+    return counter + amount;
+}
 ```
 
-### Örnek Program
+### Built-in Functions
+
+| Function      | Description                     |
+|---------------|---------------------------------|
+| `print(x)`    | Print value (no newline)        |
+| `println(x)`  | Print value + newline           |
+| `sqrt(x)`     | Square root                     |
+| `abs(x)`      | Absolute value                  |
+| `int(x)`      | Cast float → int                |
+| `float(x)`    | Cast int → float                |
+
+### Comments
 
 ```mfz
-// fibonacci.mfz
-int fibonacci(int n) {
-    if (n <= 1) { return n; }
-    return fibonacci(n - 1) + fibonacci(n - 2);
-}
+// single line
 
-int i = 0;
-while (i <= 10) {
-    println(fibonacci(i));
-    i = i + 1;
-}
+/* multi
+   line */
 ```
 
 ---
 
-## Proje Yapısı
+## Project Structure
 
 ```
 mfz-lang/
 ├── mfz/
-│   ├── lexer.h          # Token tipleri, Lexer yapısı, API
-│   ├── lexer.c          # Tokenizer implementasyonu
-│   ├── parser.h         # AST düğüm tipleri, Parser yapısı, API
-│   ├── parser.c         # Recursive descent parser
-│   ├── interpreter.h    # Değer tipleri, Env, Interpreter yapısı, API
-│   ├── interpreter.c    # Tree-walk interpreter
-│   └── main.c           # Giriş noktası, .mfz dosya çalıştırıcı
-├── docs/                # Detaylı belgeler
-├── development_guide.md # Yeni özellik ekleme rehberi
+│   ├── lexer.h / lexer.c          # Tokenizer
+│   ├── parser.h / parser.c        # Recursive descent parser
+│   ├── interpreter.h / interpreter.c  # Tree-walk interpreter
+│   └── main.c                     # Entry point, .mfz runner
+├── docs/
+│   ├── language_spec.md           # Grammar, type system, operator precedence
+│   ├── architecture.md            # Internal design, data flow
+│   └── examples.md                # Example programs
+├── development_guide.md           # How to add new syntax/features
+├── install.sh                     # Linux installer (called by make install)
+├── uninstall.sh                   # Linux uninstaller
+├── install.bat                    # Windows installer
+├── uninstall.bat                  # Windows uninstaller
 ├── Makefile
-├── .gitignore
+├── mfz.png                        # File icon (Linux)
+├── mfz.ico                        # File icon (Windows)
 └── README.md
 ```
 
-### Mimari
+---
 
-```
-Kaynak (.mfz)
-    │
-    ▼
-[Lexer]          lexer.c — karakterleri token'lara ayırır
-    │
-    ▼  Token[]
-[Parser]         parser.c — token'lardan AST üretir
-    │
-    ▼  Node* (AST)
-[Interpreter]    interpreter.c — AST'yi ziyaret ederek çalıştırır
-    │
-    ▼
-Çıktı
-```
+## Extending the Language
+
+See [`development_guide.md`](development_guide.md) for step-by-step instructions on adding new keywords, operators, statements, built-in functions, and value types.
 
 ---
 
-## Geliştirme
-
-Yeni özellik eklemek için `development_guide.md` dosyasına bakın.
-
-### Hızlı Derleme & Test
-
-```bash
-make
-./mfz/mfz test.mfz --all
-```
-
-### Katkıda Bulunma
-
-1. Fork'la
-2. Feature branch oluştur (`git checkout -b feature/yeni-ozellik`)
-3. Değişikliklerini commit'le
-4. Pull request aç
-
----
-
-## Lisans
+## License
 
 MIT

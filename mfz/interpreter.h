@@ -73,6 +73,7 @@ typedef struct {
     FuncEntry funcs[FUNC_MAX];
     int       func_count;
     int       had_error;
+    Env      *global_env;  /* FIX #4: eval_call icin global kapsam referansi */
 } Interpreter;
 
 /* ─────────────────────────────────────────

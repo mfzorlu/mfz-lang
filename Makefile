@@ -1,5 +1,5 @@
 # MFZ Lang — Makefile
-# Kullanım: make | make clean | make run FILE=program.mfz
+# Kullanım: make | make install | make uninstall | make clean
 
 CC      = gcc
 CFLAGS  = -Wall -Wextra -std=c11
@@ -21,7 +21,15 @@ run: $(TARGET)
 	@if [ -z "$(FILE)" ]; then echo "Kullanım: make run FILE=program.mfz"; exit 1; fi
 	./$(TARGET) $(FILE)
 
+install: $(TARGET)
+	@chmod +x install.sh
+	@./install.sh
+
+uninstall:
+	@chmod +x uninstall.sh
+	@./uninstall.sh
+
 clean:
 	rm -f $(TARGET) $(SRC_DIR)/*.o
 
-.PHONY: all run clean
+.PHONY: all run install uninstall clean

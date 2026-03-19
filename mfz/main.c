@@ -21,10 +21,18 @@
 static char *read_file(const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) { fprintf(stderr, "Hata: '%s' açılamadı\n", path); return NULL; }
-    fseek(f, 0, SEEK_END); long size = ftell(f); rewind(f);
-    char *buf = malloc(size + 1);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    rewind(f);
+    /* FIX #3: ftell() bir dizin veya özel dosya icin -1 doner.
+     * -1 + 1 = 0 -> malloc(0), sonra fread'e size_t olarak cast edilince
+     * 18 kentrilyon byte okumaya calisir -> heap overflow. */
+    if (size < 0) { fclose(f); fprintf(stderr, "Hata: '%s' okunabilir bir dosya degil\n", path); return NULL; }
+    char *buf = malloc((size_t)size + 1);
     if (!buf) { fclose(f); return NULL; }
-    fread(buf, 1, size, f); buf[size] = '\0'; fclose(f);
+    fread(buf, 1, (size_t)size, f);
+    buf[size] = '\0';
+    fclose(f);
     return buf;
 }
 

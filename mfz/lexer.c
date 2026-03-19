@@ -114,16 +114,18 @@ static Token match_number(Lexer *L) {
     int  line = L->line, col = L->col;
     char buf[64]; int i = 0, is_float = 0;
 
-    while (isdigit((unsigned char)peek_c(L)) && i < 63)
+    /* FIX #1: buf[64] -> max i=63 + null terminator=buf[63].
+     * Nokta + ondalik icin yer birak: tam sayi kismi en fazla 61 karakter. */
+    while (isdigit((unsigned char)peek_c(L)) && i < 61)
         buf[i++] = advance_c(L);
 
     if (peek_c(L) == '.' && isdigit((unsigned char)peek_next_c(L))) {
         is_float = 1;
-        buf[i++] = advance_c(L);
+        if (i < 62) buf[i++] = advance_c(L); /* nokta — yer garantili */
         while (isdigit((unsigned char)peek_c(L)) && i < 63)
             buf[i++] = advance_c(L);
     }
-    buf[i] = '\0';
+    buf[i] = '\0';  /* i <= 63, her zaman guvenli */
 
     Token t = make_tok(is_float ? TOK_FLOAT_LIT : TOK_INT_LIT, buf, line, col);
     if (is_float) t.value.fval = atof(buf);
@@ -138,7 +140,10 @@ static Token match_string(Lexer *L) {
 
     while (peek_c(L) && peek_c(L) != '"' && i < 255) {
         if (peek_c(L) == '\\') {
-            advance_c(L);
+            advance_c(L);  /* '\\' karakterini tüket */
+            /* FIX #2: EOF kontrolü — dosya '\' ile bitiyorsa
+             * ikinci advance_c NULL okur ve bellek dışına çıkar. */
+            if (!peek_c(L)) break;
             switch (advance_c(L)) {
                 case 'n':  buf[i++] = '\n'; break;
                 case 't':  buf[i++] = '\t'; break;
@@ -236,8 +241,11 @@ Token *tokenize(const char *src, int *out_count) {
     while (1) {
         if (count >= cap) {
             cap *= 2;
-            toks = realloc(toks, cap * sizeof(Token));
-            if (!toks) return NULL;
+            /* FIX #5: realloc NULL donerse eski pointer kaybolur (memory leak).
+             * Gecici pointer kullan; basarisizsa eskiyi serbest birak. */
+            Token *tmp = realloc(toks, cap * sizeof(Token));
+            if (!tmp) { free(toks); return NULL; }
+            toks = tmp;
         }
         toks[count] = next_token(&L);
         count++;

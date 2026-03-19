@@ -166,7 +166,9 @@ static Node *parse_call(Parser *P) {
             do {
                 if (argc >= cap) {
                     cap *= 2;
-                    args = realloc(args, cap * sizeof(Node *));
+                    Node **tmp_a = realloc(args, cap * sizeof(Node *));
+                    if (!tmp_a) { free(args); return new_node(NODE_INT_LIT, 0); } /* FIX #5 */
+                    args = tmp_a;
                 }
                 args[argc++] = parse_expr(P);
             } while (match_tok(P, TOK_COMMA));
@@ -288,7 +290,9 @@ static Node *parse_block(Parser *P) {
     while (!check(P, TOK_RBRACE) && !check(P, TOK_EOF)) {
         if (count >= cap) {
             cap *= 2;
-            stmts = realloc(stmts, cap * sizeof(Node *));
+            Node **tmp_s = realloc(stmts, cap * sizeof(Node *));
+            if (!tmp_s) { free(stmts); return new_node(NODE_BLOCK, 0); } /* FIX #5 */
+            stmts = tmp_s;
         }
         stmts[count++] = parse_stmt(P);
     }
@@ -400,8 +404,14 @@ static Node *parse_func_decl(Parser *P) {
         do {
             if (pcount >= pcap) {
                 pcap *= 2;
-                pnames = realloc(pnames, pcap * sizeof(*pnames));
-                ptypes = realloc(ptypes, pcap * sizeof(TokenType));
+                /* FIX #5: iki realloc'u ayri kontrol et — realloc NULL donerse
+                 * orijinal pointer hala gecerli, free edilmedi. */
+                char (*tmp_n)[64] = realloc(pnames, pcap * sizeof(*pnames));
+                if (!tmp_n) { free(pnames); free(ptypes); P->had_error = 1; break; }
+                pnames = tmp_n;
+                TokenType *tmp_t = realloc(ptypes, pcap * sizeof(TokenType));
+                if (!tmp_t) { free(pnames); free(ptypes); P->had_error = 1; break; }
+                ptypes = tmp_t;
             }
             if (!is_type(P)) {
                 fprintf(stderr, "[%d:%d] Hata: Parametre tipi beklendi\n",
@@ -475,7 +485,7 @@ Node *parse_program(Parser *P) {
     int    count = 0;
 
     while (!check(P, TOK_EOF)) {
-        if (count >= cap) { cap *= 2; decls = realloc(decls, cap * sizeof(Node*)); }
+        if (count >= cap) { cap *= 2; Node **tmp_d = realloc(decls, cap * sizeof(Node*)); if (!tmp_d) { free(decls); P->had_error = 1; break; } decls = tmp_d; } /* FIX #5 */
         decls[count++] = parse_stmt(P);
         if (P->had_error) { synchronize(P); P->had_error = 0; }
     }

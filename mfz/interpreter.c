@@ -295,8 +295,9 @@ static Value eval_call(Interpreter *I, Node *n, Env *env) {
         if (strcmp(I->funcs[i].name, n->as.call.name) == 0) {
             Node *decl = I->funcs[i].decl;
 
-            /* Yeni kapsam — parametre bağlama */
-            Env *fenv = env_new(NULL); /* global kapsam — NULL */
+            /* FIX #4: Fonksiyon kapsaminin parent'i global env olmali.
+             * NULL verince fonksiyon hicbir global degiskene ulasamiyor. */
+            Env *fenv = env_new(I->global_env);
             int pc = decl->as.func_decl.param_count;
             if (argc != pc) {
                 fprintf(stderr, "[satır %d] '%s': %d argüman beklendi, %d verildi\n",
@@ -487,15 +488,17 @@ Value interp_exec(Interpreter *I, Node *stmt, Env *env) {
  * PUBLIC API
  * ───────────────────────────────────────── */
 void interp_init(Interpreter *I) {
-    I->func_count = 0;
-    I->had_error  = 0;
+    I->func_count  = 0;
+    I->had_error   = 0;
+    I->global_env  = NULL;  /* FIX #4 */
 }
 
 void interp_run(Interpreter *I, Node *program) {
     if (program->type != NODE_PROGRAM) return;
 
-    /* Global kapsam */
+    /* Global kapsam — FIX #4: pointer'i struct'a kaydet, eval_call kullanabilsin */
     Env *global = env_new(NULL);
+    I->global_env = global;
 
     /* 1. geçiş: fonksiyon bildirimlerini kaydet */
     for (int i = 0; i < program->as.program.count; i++) {
@@ -514,5 +517,6 @@ void interp_run(Interpreter *I, Node *program) {
         if (I->had_error || ret.active) break;
     }
     g_ret = NULL;
+    I->global_env = NULL;  /* FIX #4: serbest birakmadan once NULL'la */
     env_free(global);
 }

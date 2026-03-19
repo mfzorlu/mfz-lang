@@ -1,0 +1,44 @@
+// test.mfz — MFZ dili test programi
+
+int faktoriyel(int n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * faktoriyel(n - 1);
+}
+
+int fibonacci(int n) {
+    if (n <= 1) {
+        return n;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+// Faktoriyel testi
+int i = 1;
+while (i <= 7) {
+    print(i);
+    println(faktoriyel(i));
+    i = i + 1;
+}
+
+// Fibonacci testi
+println(fibonacci(10));
+
+// String ve aritmetik
+float pi = 3.14159;
+float r  = 5.0;
+float alan = pi * r * r;
+println(alan);
+
+// if/else zinciri
+int x = 42;
+if (x > 100) {
+    println(0);
+} else {
+    if (x > 50) {
+        println(1);
+    } else {
+        println(2);
+    }
+}

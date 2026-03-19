@@ -1,0 +1,24 @@
+# Derleme çıktıları
+mfz/mfz
+mfz/*.o
+*.o
+*.a
+*.out
+
+# Geçici dosyalar
+*.tmp
+*.log
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test çıktıları
+mfz/debug.mfz

@@ -2,7 +2,7 @@
 # install.sh — MFZ Lang system installer (Linux)
 #
 # Called by: make install
-# Do NOT run directly unless you know what you're doing.
+# Works correctly both with and without sudo.
 #
 # What this does:
 #   1. Copies mfz binary to /usr/local/bin/
@@ -20,6 +20,17 @@ success() { echo -e "${GREEN}[✓]${NC} $1"; }
 warning() { echo -e "${YELLOW}[!]${NC} $1"; }
 error()   { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
+# ── Gerçek kullanıcıyı belirle ──
+# sudo ile çalıştırılmışsa SUDO_USER set edilir.
+# MIME/ikon/desktop her zaman gerçek kullanıcının home'una gider.
+if [ -n "$SUDO_USER" ]; then
+    REAL_USER="$SUDO_USER"
+    REAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+else
+    REAL_USER="$USER"
+    REAL_HOME="$HOME"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BINARY="$SCRIPT_DIR/mfz/mfz"
 ICON_PNG="$SCRIPT_DIR/mfz.png"
@@ -29,6 +40,8 @@ MIME_TYPE="text/x-mfz"
 echo ""
 echo "  MFZ Lang — Installer"
 echo "  ─────────────────────────"
+echo "  Installing for user: $REAL_USER"
+echo "  Home directory:      $REAL_HOME"
 echo ""
 
 # ── Binary kontrolü ──
@@ -36,13 +49,30 @@ echo ""
 
 # ── 1. Binary kur ──
 info "Installing binary to /usr/local/bin/mfz ..."
-sudo install -m 755 "$BINARY" /usr/local/bin/mfz
-success "mfz installed. You can now run 'mfz program.mfz' from anywhere."
+if sudo install -m 755 "$BINARY" /usr/local/bin/mfz 2>/dev/null; then
+    success "mfz installed. You can now run 'mfz program.mfz' from anywhere."
+else
+    # sudo yoksa local bin'e koy
+    mkdir -p "$REAL_HOME/.local/bin"
+    install -m 755 "$BINARY" "$REAL_HOME/.local/bin/mfz"
+    warning "Could not install to /usr/local/bin/ (no sudo). Installed to ~/.local/bin/mfz instead."
+    warning "Make sure ~/.local/bin is in your PATH."
+fi
+
+# ── Kullanıcı adına çalışacak yardımcı fonksiyon ──
+# sudo ile çalışıldıysa komutları gerçek kullanıcı olarak çalıştır
+run_as_user() {
+    if [ -n "$SUDO_USER" ]; then
+        sudo -u "$SUDO_USER" "$@"
+    else
+        "$@"
+    fi
+}
 
 # ── 2. MIME tipi ──
 info "Registering .mfz MIME type ..."
-mkdir -p "$HOME/.local/share/mime/packages"
-cat > "$HOME/.local/share/mime/packages/mfz.xml" << 'EOF'
+run_as_user mkdir -p "$REAL_HOME/.local/share/mime/packages"
+cat > /tmp/mfz-mime.xml << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="text/x-mfz">
@@ -51,23 +81,24 @@ cat > "$HOME/.local/share/mime/packages/mfz.xml" << 'EOF'
   </mime-type>
 </mime-info>
 EOF
-update-mime-database "$HOME/.local/share/mime"
+run_as_user cp /tmp/mfz-mime.xml "$REAL_HOME/.local/share/mime/packages/mfz.xml"
+rm /tmp/mfz-mime.xml
+run_as_user update-mime-database "$REAL_HOME/.local/share/mime"
 success "MIME type registered."
 
 # ── 3. İkon ──
 if [ -f "$ICON_PNG" ]; then
     info "Installing icons ..."
 
-    # Her zaman hicolor'a koy (evrensel fallback)
+    # Aktif ikon temasını öğren
+    CURRENT_THEME=$(run_as_user gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || echo "")
+
+    # Kurulacak temalar: hicolor (evrensel fallback) + aktif tema + kurulu temalar
     THEMES="hicolor"
-
-    # Aktif ikon temasını ekle
-    CURRENT_THEME=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || echo "")
     [ -n "$CURRENT_THEME" ] && THEMES="$THEMES $CURRENT_THEME"
-
-    # ~/.local/share/icons altındaki tüm kurulu temaları ekle
-    if [ -d "$HOME/.local/share/icons" ]; then
-        for d in "$HOME/.local/share/icons"/*/; do
+    if [ -d "$REAL_HOME/.local/share/icons" ]; then
+        for d in "$REAL_HOME/.local/share/icons"/*/; do
+            [ -d "$d" ] || continue
             THEME_NAME=$(basename "$d")
             echo "$THEMES" | grep -qw "$THEME_NAME" || THEMES="$THEMES $THEME_NAME"
         done
@@ -79,16 +110,20 @@ if [ -f "$ICON_PNG" ]; then
 
     for THEME in $THEMES; do
         for SIZE in $SIZES; do
-            DIR="$HOME/.local/share/icons/$THEME/${SIZE}x${SIZE}/mimetypes"
-            mkdir -p "$DIR"
+            DIR="$REAL_HOME/.local/share/icons/$THEME/${SIZE}x${SIZE}/mimetypes"
+            run_as_user mkdir -p "$DIR"
             if [ "$HAS_CONVERT" -eq 1 ]; then
-                convert "$ICON_PNG" -resize "${SIZE}x${SIZE}" "$DIR/${ICON_NAME}.png" 2>/dev/null || true
+                convert "$ICON_PNG" -resize "${SIZE}x${SIZE}" "/tmp/mfz-icon-${SIZE}.png" 2>/dev/null || true
+                run_as_user cp "/tmp/mfz-icon-${SIZE}.png" "$DIR/${ICON_NAME}.png" 2>/dev/null || true
             else
-                [ "$SIZE" = "256" ] && cp "$ICON_PNG" "$DIR/${ICON_NAME}.png"
+                [ "$SIZE" = "256" ] && run_as_user cp "$ICON_PNG" "$DIR/${ICON_NAME}.png"
             fi
         done
-        gtk-update-icon-cache -f -t "$HOME/.local/share/icons/$THEME" 2>/dev/null || true
+        run_as_user gtk-update-icon-cache -f -t "$REAL_HOME/.local/share/icons/$THEME" 2>/dev/null || true
     done
+
+    # Geçici icon dosyalarını temizle
+    rm -f /tmp/mfz-icon-*.png
 
     [ "$HAS_CONVERT" -eq 0 ] && warning "ImageMagick not found — only 256px icon installed. For best results: sudo apt install imagemagick"
     success "Icons installed for themes: $THEMES"
@@ -98,9 +133,10 @@ fi
 
 # ── 4. .desktop dosyası ──
 info "Creating .desktop entry ..."
-DESKTOP_DIR="$HOME/.local/share/applications"
-mkdir -p "$DESKTOP_DIR"
+DESKTOP_DIR="$REAL_HOME/.local/share/applications"
+run_as_user mkdir -p "$DESKTOP_DIR"
 
+# Terminal emülatörü bul
 if   command -v gnome-terminal >/dev/null 2>&1; then
     EXEC="gnome-terminal -- bash -c '/usr/local/bin/mfz %f; echo; read -p \"Press Enter to close...\"'"
 elif command -v xterm >/dev/null 2>&1; then
@@ -112,7 +148,7 @@ else
     warning "No terminal emulator found — double-click will run without a window."
 fi
 
-cat > "$DESKTOP_DIR/mfz.desktop" << EOF
+cat > /tmp/mfz.desktop << EOF
 [Desktop Entry]
 Name=MFZ Interpreter
 GenericName=MFZ Language Interpreter
@@ -126,9 +162,11 @@ Terminal=false
 StartupNotify=false
 EOF
 
-chmod +x "$DESKTOP_DIR/mfz.desktop"
-update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
-xdg-mime default mfz.desktop "$MIME_TYPE" 2>/dev/null || true
+run_as_user cp /tmp/mfz.desktop "$DESKTOP_DIR/mfz.desktop"
+run_as_user chmod +x "$DESKTOP_DIR/mfz.desktop"
+rm /tmp/mfz.desktop
+run_as_user update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+run_as_user xdg-mime default mfz.desktop "$MIME_TYPE" 2>/dev/null || true
 success ".desktop entry created — .mfz files will open in terminal on double-click."
 
 echo ""

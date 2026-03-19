@@ -84,6 +84,12 @@ static void skip_ws(Lexer *L) {
     while (1) {
         while (isspace((unsigned char)peek_c(L))) advance_c(L);
 
+        /* shebang: #! ile baslayan satiri yorum say — ./program.mfz calistirmak icin */
+        if (peek_c(L) == '#' && peek_next_c(L) == '!') {
+            while (peek_c(L) && peek_c(L) != '\n') advance_c(L);
+            continue;
+        }
+
         /* // tek satır */
         if (peek_c(L) == '/' && peek_next_c(L) == '/') {
             while (peek_c(L) && peek_c(L) != '\n') advance_c(L);
